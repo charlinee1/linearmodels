@@ -128,7 +128,7 @@ nyc_airbnb1|>
   broom::tidy()
 
 ```
-use an *anonymous* functino instead of `lm_airbnb`
+use an *anonymous* function instead of `lm_airbnb`
 
 ```{r}
 nested_lm_results = nyc_airbnb1 |>
@@ -139,10 +139,17 @@ nested_lm_results = nyc_airbnb1 |>
   )|>
   select(borough, results)|>
   unnest(results)
+
+nested_lm_results |>
+  select(borough, term, estimate)|>
+  pivot_wider(
+    names_from = term,
+    values_from = estimate
+  )
 ```
 
 
-create a list of dataframes, and iterate to fit the model each time.
+create a list of dataframe, and iterate to fit the model each time.
 ```{r}
 nested_lm_results = nyc_airbnb1 |>
   nest(data=-borough)|>
@@ -164,6 +171,34 @@ nested_lm_results |>
   )
 ```
 
+## let's do more examples
+```{r}
 
+man_analysis <- 
+  nyc_airbnb1 |>
+  filter(borough == "Manhattan") |>
+  nest(data = -neighborhood) |>
+  mutate(
+    fits = map(data, ~lm(price ~ stars + room_type, data = .x)),
+    results = map(fits, broom::tidy)
+  ) |>
+  select(neighborhood, results) |>
+  unnest(results)
+
+
+```
+
+## make a plot
+```{r}
+man_analysis|>
+  filter(term=="stars") |>
+  mutate(
+    neighborhood=fct_reorder(neighborhood, estimate)
+  )|>
+  ggplot(aes(x=neighborhood, y=estimate))+
+  geom_point()+
+  theme (axis.text.x = element_text(angle = 80, hjust = 1))
+  
+```
 
 
