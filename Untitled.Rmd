@@ -68,9 +68,65 @@ resid(fit2)
 nyc_airbnb1 |>
   modelr::add_residuals(fit2)|>
   modelr::add_predictions(fit2)|>
-  ggplot(aes(x=resid))+
-  geom_histogram()
+  filter(resid<1000)|>
+  ggplot(aes(x=borough, y=resid))+
+  geom_violin()
 ```
+
+## hypothesis testing
+```{r}
+
+fit_alt=lm(price~stars+borough + room_type, data=nyc_airbnb1)
+fit_null=lm(price~stars+borough, data=nyc_airbnb1)
+
+anova(fit_null, fit_alt)|>
+  broom::tidy()
+```
+
+## interactions and nested data
+```{r}
+fit_interactions=
+  lm(price~stars*borough + room_type*borough, data=nyc_airbnb1)|>
+  broom::tidy()
+  
+
+```
+
+```{r}
+
+nyc_airbnb1|>
+  filter(borough=="Brooklyn")|>
+  lm(price~stars+room_type, data= _)|>
+  broom::tidy()
+
+
+
+nyc_airbnb1|>
+  filter(borough=="Bronx")|>
+  lm(price~stars+room_type, data= _)|>
+  broom::tidy()
+
+
+nyc_airbnb1|>
+  filter(borough=="Queens")|>
+  lm(price~stars+room_type, data= _)|>
+  broom::tidy()
+```
+## Write a short function
+```{r}
+lm_airbnb =function(df){
+  
+  lm(price~stars + room_type, data=df)
+  
+}
+
+nyc_airbnb1|>
+  filter(borough=="Queens")|>
+  lm_airbnb()|>
+  broom::tidy()
+
+```
+
 
 
 
