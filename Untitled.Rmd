@@ -120,11 +120,48 @@ lm_airbnb =function(df){
   
 }
 
+
+
 nyc_airbnb1|>
   filter(borough=="Queens")|>
   lm_airbnb()|>
   broom::tidy()
 
+```
+use an *anonymous* functino instead of `lm_airbnb`
+
+```{r}
+nested_lm_results = nyc_airbnb1 |>
+  nest(data=-borough)|>
+  mutate(
+    fits=map(data, \(df) lm(price~stars + room_type, data=df)),
+    results=map(fits, broom::tidy)
+  )|>
+  select(borough, results)|>
+  unnest(results)
+```
+
+
+create a list of dataframes, and iterate to fit the model each time.
+```{r}
+nested_lm_results = nyc_airbnb1 |>
+  nest(data=-borough)|>
+  mutate(
+    fits=map(data, lm_airbnb),
+    results=map(fits, broom::tidy)
+  )|>
+  select(borough, results)|>
+  unnest(results)
+```
+
+
+```{r}
+nested_lm_results |>
+  select(borough, term, estimate)|>
+  pivot_wider(
+    names_from = term,
+    values_from = estimate
+  )
 ```
 
 
