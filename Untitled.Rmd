@@ -7,6 +7,7 @@ date: "2025-11-06"
 ```{r setup, include=FALSE}
 library(tidyverse)
 library(p8105.datasets)
+library(broom)
 
 set.seed(1)
 ```
@@ -24,181 +25,53 @@ nyc_airbnb1 =
   select(price, stars, borough, neighborhood, room_type)
 ```
 
+let's fit a model relating price to stars, and borough.
+
+```{r include=FALSE}
+fit = lm(price ~ stars + borough, data = nyc_airbnb1)
+summary(fit)
+coef(fit)
+resid(fit)
+broom::glance(fit)
+```
+
+```{r}
+broom::tidy(fit)%>%
+  select(-std.error, -statistic) %>%
+  mutate(
+    term= str_replace(term, "borough", "Borough: " )
+  )%>%
+  knitr::kable(digits=3)
+```
+
+
+## be in control of factors
+change ref category
+
+```{r}
+nyc_airbnb1=
+  nyc_airbnb1 %>%
+  mutate(
+    borough=fct_infreq(borough),
+    room_type=fct_infreq(room_type)
+  )
+```
+
+
+```{r}
+nyc_airbnb2=
+  nyc_airbnb1%>%
+  ggplot(aes(x=stars,y=price,color=borough))+
+  geom_point()
+```
+
 
 ```{r}
 fit = lm(price ~ stars + borough, data = nyc_airbnb1)
-summary(fit)
-```
-
-do some additional cleaning then refit.
-
-```{r}
-
-nyc_airbnb1 |>
-  mutate(
-    borough = fct_infreq(borough),
-    room_type = fct_infreq(room_type))
-
-fit2 = lm(price ~ stars + borough, data = nyc_airbnb1)
-
-```
-
-```{r}
-summary(fit2)
-names(summary(fit2))
-summary(fit)[["coefficients"]]
-summary(fit)[["df"]]
-
-```
-
-```{r}
-fit2 |>
-  broom::tidy()|>
-  mutate(
-    term=str_replace(term, "borough", "Borough:"))|>
-  select(term, estimate, p.value)|>
-  knitr::kable(digits=3)
-
-fit2|>
-  broom::glance()
-resid(fit2)
-```
-
-```{r}
-nyc_airbnb1 |>
-  modelr::add_residuals(fit2)|>
-  modelr::add_predictions(fit2)|>
-  filter(resid<1000)|>
-  ggplot(aes(x=borough, y=resid))+
-  geom_violin()
-```
-
-## hypothesis testing
-```{r}
-
-fit_alt=lm(price~stars+borough + room_type, data=nyc_airbnb1)
-fit_null=lm(price~stars+borough, data=nyc_airbnb1)
-
-anova(fit_null, fit_alt)|>
-  broom::tidy()
-```
-
-## interactions and nested data
-```{r}
-fit_interactions=
-  lm(price~stars*borough + room_type*borough, data=nyc_airbnb1)|>
-  broom::tidy()
-  
-
-```
-
-```{r}
-
-nyc_airbnb1|>
-  filter(borough=="Brooklyn")|>
-  lm(price~stars+room_type, data= _)|>
-  broom::tidy()
-
-
-
-nyc_airbnb1|>
-  filter(borough=="Bronx")|>
-  lm(price~stars+room_type, data= _)|>
-  broom::tidy()
-
-
-nyc_airbnb1|>
-  filter(borough=="Queens")|>
-  lm(price~stars+room_type, data= _)|>
-  broom::tidy()
-```
-## Write a short function
-```{r}
-lm_airbnb =function(df){
-  
-  lm(price~stars + room_type, data=df)
-  
-}
-
-
-
-nyc_airbnb1|>
-  filter(borough=="Queens")|>
-  lm_airbnb()|>
-  broom::tidy()
-
-```
-use an *anonymous* function instead of `lm_airbnb`
-
-```{r}
-nested_lm_results = nyc_airbnb1 |>
-  nest(data=-borough)|>
-  mutate(
-    fits=map(data, \(df) lm(price~stars + room_type, data=df)),
-    results=map(fits, broom::tidy)
-  )|>
-  select(borough, results)|>
-  unnest(results)
-
-nested_lm_results |>
-  select(borough, term, estimate)|>
-  pivot_wider(
-    names_from = term,
-    values_from = estimate
-  )
+broom::tidy(fit)
 ```
 
 
-create a list of dataframe, and iterate to fit the model each time.
-```{r}
-nested_lm_results = nyc_airbnb1 |>
-  nest(data=-borough)|>
-  mutate(
-    fits=map(data, lm_airbnb),
-    results=map(fits, broom::tidy)
-  )|>
-  select(borough, results)|>
-  unnest(results)
-```
 
-
-```{r}
-nested_lm_results |>
-  select(borough, term, estimate)|>
-  pivot_wider(
-    names_from = term,
-    values_from = estimate
-  )
-```
-
-## let's do more examples
-```{r}
-
-man_analysis <- 
-  nyc_airbnb1 |>
-  filter(borough == "Manhattan") |>
-  nest(data = -neighborhood) |>
-  mutate(
-    fits = map(data, ~lm(price ~ stars + room_type, data = .x)),
-    results = map(fits, broom::tidy)
-  ) |>
-  select(neighborhood, results) |>
-  unnest(results)
-
-
-```
-
-## make a plot
-```{r}
-man_analysis|>
-  filter(term=="stars") |>
-  mutate(
-    neighborhood=fct_reorder(neighborhood, estimate)
-  )|>
-  ggplot(aes(x=neighborhood, y=estimate))+
-  geom_point()+
-  theme (axis.text.x = element_text(angle = 80, hjust = 1))
-  
-```
 
 
