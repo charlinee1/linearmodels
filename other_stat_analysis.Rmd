@@ -1,0 +1,160 @@
+---
+title: "linear model"
+output: github_document
+date: "2025-11-06"
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(p8105.datasets)
+library(broom)
+
+set.seed(1)
+```
+
+```{r}
+data("nyc_airbnb")
+
+nyc_airbnb1 = 
+  nyc_airbnb |> 
+  mutate(stars = review_scores_location / 2) |> 
+  rename(
+    borough = neighbourhood_group,
+    neighborhood = neighbourhood) |> 
+  filter(borough != "Staten Island") |> 
+  select(price, stars, borough, neighborhood, room_type)
+```
+
+let's fit a model relating price to stars, and borough.
+
+```{r include=FALSE}
+fit = lm(price ~ stars + borough, data = nyc_airbnb1)
+summary(fit)
+coef(fit)
+resid(fit)
+broom::glance(fit)
+```
+
+```{r}
+broom::tidy(fit)%>%
+  select(-std.error, -statistic) %>%
+  mutate(
+    term= str_replace(term, "borough", "Borough: " )
+  )%>%
+  knitr::kable(digits=3)
+```
+
+
+## be in control of factors
+change ref category
+
+```{r}
+nyc_airbnb1=
+  nyc_airbnb1 %>%
+  mutate(
+    borough=fct_infreq(borough),
+    room_type=fct_infreq(room_type)
+  )
+```
+
+
+```{r}
+nyc_airbnb2=
+  nyc_airbnb1%>%
+  ggplot(aes(x=stars,y=price,color=borough))+
+  geom_point()
+```
+
+
+```{r}
+fit = lm(price ~ stars + borough, data = nyc_airbnb1)
+broom::tidy(fit)
+```
+
+
+## diagnostics of residuals
+
+```{r}
+modelr::add_residuals(nyc_airbnb1, fit) %>%
+  ggplot(aes(x=borough, y=resid))+
+           geom_violin()+
+  ylim(-500,1500)
+
+
+nyc_airbnb1 %>%
+  modelr::add_residuals(fit) %>%
+  ggplot(aes(x=stars, y=resid))+
+           geom_point()+
+  facet_wrap(.~borough)
+```
+
+
+## hypothesis test
+This does t test on default
+```{r}
+fit%>%
+broom::tidy()
+  
+```
+
+What about significance of `borough`?
+```{r}
+
+fit_null=lm(price~stars, data=nyc_airbnb1)
+fit_alt=lm(price~stars + borough, data=nyc_airbnb1)
+anova(fit_null, fit_alt)%>%
+  broom::tidy()
+
+```
+
+## nest data, fit models, interactions
+
+This is formal and complicated
+```{r}
+
+fit=lm(price~stars+borough+room_type*borough, data=nyc_airbnb1)
+broom::tidy(fit)
+
+
+```
+
+This is more exploratory and easy to understand.
+```{r}
+nyc_airbnb1 %>%
+  nest(data=-borough)%>%
+  mutate(
+    models=map(.x=data, ~lm(price ~ stars,data=.x)),
+  results=map(models, broom::tidy)
+    )%>%
+  select(-data,-models)%>%
+  unnest(results)%>%
+  filter(term=="stars")
+```
+
+
+let's nest even more
+
+```{r}
+nyc_airbnb1 %>%
+  filter(borough=="Manhattan")%>%
+  nest(data=-neighborhood) %>%
+  mutate(
+    models=map(.x=data, ~lm(price ~ stars+room_type,data=.x)),
+  results=map(models, broom::tidy)
+    )%>%
+  select(-data,-models)%>%
+  unnest(results) %>%
+  filter(str_detect(term, "room_type"))%>%
+  ggplot(aes(x=neighborhood, y=estimate))+
+  geom_point()+
+  facet_wrap(.~term)+
+  theme(axis.text.x = element_text(angle=90,
+                                   vjust=0.8, hjust=0.5))
+
+
+
+```
+
+
+
+
